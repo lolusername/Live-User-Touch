@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Audio-Reactive Fashion Video</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #000;
+        }
+        
+        #glCanvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #startAudio {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            z-index: 100;
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid white;
+            color: white;
+            cursor: pointer;
+            font-family: Arial, sans-serif;
+            backdrop-filter: blur(5px);
+        }
+        
+        #startAudio:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="glCanvas"></canvas>
+    <button id="startAudio">Start Audio Capture</button>
+    <button id="stopAudio" style="position: fixed; top: 10px; left: 150px; z-index: 100; display: none;">
+        Stop Audio Capture
+    </button>
+    <script type="module" src="script.js"></script>
+</body>
+
+</html>
