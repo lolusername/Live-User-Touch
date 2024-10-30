@@ -12,13 +12,15 @@
         }
         
         #glCanvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            position: fixed;
-            top: 0;
-            left: 0;
-        }
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: black;
+}
 
         .audio-controls {
             position: fixed;
@@ -82,14 +84,14 @@
 
     <div class="video-controls">
         <div>
-            <span>TEMP</span>
+            <span>COLOR TEMP</span>
             <span class="temp-value">50%</span>
             <div class="control-bar temp-bar">
                 <div class="control-bar-fill temp-fill"></div>
             </div>
         </div>
         <div>
-            <span>CONT</span>
+            <span>CONTRAST</span>
             <span class="contrast-value">50%</span>
             <div class="control-bar contrast-bar">
                 <div class="control-bar-fill contrast-fill"></div>

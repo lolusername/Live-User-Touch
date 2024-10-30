@@ -133,9 +133,28 @@
       const vertexShaderSource = `
           attribute vec4 a_position;
           attribute vec2 a_texCoord;
+          uniform vec2 u_resolution;
           varying vec2 v_texCoord;
+
           void main() {
-              gl_Position = a_position;
+              // Calculate video aspect ratio (assuming 16:9 video)
+              float videoAspect = 16.0/9.0;
+              float screenAspect = u_resolution.x/u_resolution.y;
+              
+              vec2 position = a_position.xy;
+              
+              // Adjust position to maintain aspect ratio
+              if (screenAspect > videoAspect) {
+                  // Screen is wider than video
+                  float scale = screenAspect / videoAspect;
+                  position.x /= scale;
+              } else {
+                  // Screen is taller than video
+                  float scale = videoAspect / screenAspect;
+                  position.y /= scale;
+              }
+              
+              gl_Position = vec4(position, 0.0, 1.0);
               v_texCoord = a_texCoord;
           }
       `;
