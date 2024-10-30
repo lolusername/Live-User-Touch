@@ -62,14 +62,9 @@
             analyserNode.fftSize = 256;
         }
         
-        // Only create new source node if we don't have one
-        if (!sourceNode && video) {
+        // Only create new source node if we don't have one AND we're not using audioStream
+        if (!sourceNode && video && !audioStream) {
             sourceNode = audioContext.createMediaElementSource(video);
-        }
-        
-        // Always ensure proper connections
-        if (sourceNode) {
-            sourceNode.disconnect(); // Disconnect from any previous connections
             sourceNode.connect(analyserNode);
         }
       };
@@ -91,7 +86,6 @@
                 audioStream = new MediaStream([audioTrack]);
                 sourceNode = audioContext.createMediaStreamSource(audioStream);
                 sourceNode.connect(analyserNode);
-                // Never connect to destination - we only want analysis
                 
                 document.getElementById('startAudio').style.display = 'none';
                 document.getElementById('stopAudio').style.display = 'block';
@@ -114,12 +108,9 @@
 
         if (sourceNode) {
             sourceNode.disconnect();
+            sourceNode = null;
         }
 
-        // Create new nodes for video audio
-        sourceNode = null;
-        analyserNode = null;
-        
         // Reinitialize audio for video
         initAudio();
 
@@ -575,6 +566,17 @@
                   URL.revokeObjectURL(url);
               }
           });
+      });
+
+      // Add to your init function
+      window.addEventListener('load', () => {
+          // Remove banner after animation
+          setTimeout(() => {
+              const banner = document.querySelector('.intro-banner');
+              if (banner) {
+                  banner.remove();
+              }
+          }, 2500); // Slightly longer than animation to ensure smooth fade
       });
     };
   
