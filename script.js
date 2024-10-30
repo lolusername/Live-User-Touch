@@ -6,6 +6,11 @@
     let audioStream = null;
     let audioContext, sourceNode, analyserNode;
   
+    // Add these variables at the top level inside the IIFE
+    let lastBeatTime = 0;
+    const BEAT_THRESHOLD = 0.80;  // Higher threshold for only strong beats
+    const MIN_BEAT_INTERVAL = 100;  // Shorter interval to allow quick changes on strong beats
+  
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
       const video = document.createElement('video');
@@ -51,15 +56,21 @@
         if (!audioContext) {
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
         }
-        analyserNode = audioContext.createAnalyser();
-        analyserNode.fftSize = 256;
         
-        // Don't connect video audio at all - we only want analysis, no playback
-        if (!audioStream && video) {
+        if (!analyserNode) {
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 256;
+        }
+        
+        // Only create new source node if we don't have one
+        if (!sourceNode && video) {
             sourceNode = audioContext.createMediaElementSource(video);
+        }
+        
+        // Always ensure proper connections
+        if (sourceNode) {
+            sourceNode.disconnect(); // Disconnect from any previous connections
             sourceNode.connect(analyserNode);
-            // Remove this line to prevent video audio
-            // analyserNode.connect(audioContext.destination);
         }
       };
   
@@ -91,27 +102,31 @@
         } catch (error) {
             console.error('Error starting audio capture:', error);
         }
+        updateControlsVisibility();
       });
   
-      // Add stop audio capture button listener
+      // Modified stop audio handler
       document.getElementById('stopAudio').addEventListener('click', () => {
         if (audioStream) {
-            // Stop all tracks in the audio stream
             audioStream.getTracks().forEach(track => track.stop());
             audioStream = null;
-
-            // Disconnect old source
-            if (sourceNode) {
-                sourceNode.disconnect();
-            }
-
-            // Reinitialize audio for video
-            initAudio();
-
-            // Show start button and hide stop button
-            document.getElementById('startAudio').style.display = 'block';
-            document.getElementById('stopAudio').style.display = 'none';
         }
+
+        if (sourceNode) {
+            sourceNode.disconnect();
+        }
+
+        // Create new nodes for video audio
+        sourceNode = null;
+        analyserNode = null;
+        
+        // Reinitialize audio for video
+        initAudio();
+
+        document.getElementById('startAudio').style.display = 'block';
+        document.getElementById('stopAudio').style.display = 'none';
+        
+        updateControlsVisibility();
       });
   
       // Shader sources
@@ -138,9 +153,19 @@
 
           varying vec2 v_texCoord;
 
-          // Chromatic aberration effect
+          // Balanced chromatic aberration effect
           vec3 chromaticAberration(sampler2D tex, vec2 uv, float strength) {
-              vec2 offset = strength * vec2(0.01, 0.0);
+              // Medium-high threshold for clear beats
+              float threshold = 0.4;
+              float maxOffset = 0.05;  // Moderate offset amount
+              
+              vec2 offset = vec2(0.0);
+              if (strength > threshold) {
+                  // Smoother transition with moderate intensity
+                  float normalizedStrength = min((strength - threshold) / (1.0 - threshold), 1.0);
+                  offset = vec2(maxOffset * normalizedStrength, 0.0);
+              }
+
               float r = texture2D(tex, uv + offset).r;
               float g = texture2D(tex, uv).g;
               float b = texture2D(tex, uv - offset).b;
@@ -149,67 +174,53 @@
 
           // Enhanced color grading with saturation
           vec3 colorGrade(vec3 color, float temperature, float audioLevel) {
-              vec3 cool = vec3(0.7, 0.9, 1.3);
-              vec3 warm = vec3(1.3, 1.0, 0.7);
+              // Cool colors (fashion-forward blue/purple)
+              vec3 cool = vec3(0.7, 0.9, 1.1);
+              // Warm colors (luxury gold/amber)
+              vec3 warm = vec3(1.1, 1.0, 0.7);
+            
+              // Mix between cool and warm based on mouse x
               vec3 colorGrading = mix(cool, warm, temperature);
+              
+              // Enhance saturation based on audio
               float saturation = 1.0 + audioLevel * 0.5;
               vec3 grayscale = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
               color = mix(grayscale, color, saturation);
+              
               return color * colorGrading;
-          }
-
-          // Glitch effect
-          vec2 glitchOffset(vec2 uv, float time, float audioLevel) {
-              float glitchAmount = audioLevel * 0.1;
-              float noise = fract(sin(dot(uv, vec2(120.9898, 78.233) * time)) * 43758.5453);
-              vec2 offset = vec2(0.0);
-              if (noise > 0.98) {
-                  offset.x = (noise - 0.5) * glitchAmount;
-              }
-              return offset;
           }
 
           void main() {
               vec2 uv = v_texCoord;
 
               float bassResponse = u_audioFreq * 2.0;
-              float pulseEffect = 1.0 + bassResponse * sin(u_time * 2.0) * 0.1;
+              
+              // Apply chromatic aberration based on audio
+              vec3 color = chromaticAberration(u_videoTexture, uv, 0.3 * bassResponse);
 
-              float distortion = sin(uv.y * 10.0 + u_time) * (0.002 * u_cursorSpeed + bassResponse * 0.01);
-              uv.x += distortion;
-
-              uv += glitchOffset(uv, u_time, bassResponse);
-
-              vec3 color = chromaticAberration(u_videoTexture, uv, 0.5 * bassResponse);
-
+              // Apply color grading
               color = colorGrade(color, u_mouse.x, bassResponse);
 
+              // Adjust contrast based on mouse Y
               float contrast = mix(0.8, 2.2, u_mouse.y);
               color = ((color - 0.5) * contrast) + 0.5;
-              color *= pulseEffect;
 
-              vec2 bloomUV = uv;
-              vec3 bloom = vec3(0.0);
-              float bloomStrength = 0.5 + bassResponse * 0.3;
-              
-              for(float i = 0.0; i < 4.0; i++) {
-                  bloomUV *= 0.99;
-                  bloom += texture2D(u_videoTexture, bloomUV).rgb;
-              }
-              color += bloom * bloomStrength * 0.1;
-
+              // Apply old film effect if toggled
               if (u_oldFilmEffect) {
                   float gray = dot(color, vec3(0.299, 0.587, 0.114));
                   color = vec3(gray);
 
+                  // Add film grain
                   float grain = fract(sin(dot(uv * u_time * 100.0, vec2(12.9898,78.233))) * 43758.5453);
                   color += (grain - 0.5) * 0.15;
 
+                  // Add vignette
                   vec2 position = uv - 0.5;
-                  float vignette = smoothstep(0.8, 0.2, length(position) * (1.1 + bassResponse * 0.2));
+                  float vignette = smoothstep(0.8, 0.2, length(position));
                   color *= vignette;
               }
 
+              // Final color adjustments
               color = min(color * 1.1, 1.0);
               
               gl_FragColor = vec4(color, 1.0);
@@ -315,10 +326,30 @@
           mouse.x = e.clientX / gl.canvas.width;
           mouse.y = 1 - e.clientY / gl.canvas.height;
           mouse.lastTime = currentTime;
+
+          // Update UI to reflect cursor position
+          if (!audioStream) {
+              // Update temperature bar (mouse.x)
+              const tempFill = document.querySelector('.temp-fill');
+              const tempValue = document.querySelector('.temp-value');
+              const tempPercentage = Math.round(mouse.x * 100);
+              tempFill.style.width = `${tempPercentage}%`;
+              tempValue.textContent = `${tempPercentage}%`;
+
+              // Update contrast bar (mouse.y)
+              const contrastFill = document.querySelector('.contrast-fill');
+              const contrastValue = document.querySelector('.contrast-value');
+              const contrastPercentage = Math.round(mouse.y * 100);
+              contrastFill.style.width = `${contrastPercentage}%`;
+              contrastValue.textContent = `${contrastPercentage}%`;
+          }
       });
 
-      window.addEventListener('click', () => {
-          oldFilmEffect = !oldFilmEffect;
+      canvas.addEventListener('click', (e) => {
+          // Only toggle if the click was on the canvas, not the buttons
+          if (e.target === canvas) {
+              oldFilmEffect = !oldFilmEffect;
+          }
       });
 
       // Modified double-click handler
@@ -367,14 +398,37 @@
               const frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
               analyserNode.getByteFrequencyData(frequencyData);
               
-              // Use the average of the first few frequency bins (bass frequencies)
-              let sum = 0;
-              const numBins = 4;
-              for (let i = 0; i < numBins; i++) {
-                  sum += frequencyData[i];
+              // Focus on bass and mid frequencies for better beat detection
+              let bassSum = 0;
+              let midSum = 0;
+              
+              // Bass frequencies (first few bins)
+              for (let i = 0; i < 4; i++) {
+                  bassSum += frequencyData[i];
               }
-              const averageFrequency = sum / (numBins * 255); // Normalize to 0-1
-              gl.uniform1f(audioFreqLocation, averageFrequency);
+              
+              // Mid frequencies (next few bins)
+              for (let i = 4; i < 12; i++) {
+                  midSum += frequencyData[i];
+              }
+              
+              const bassAverage = bassSum / (4 * 255); // Normalize to 0-1
+              const midAverage = midSum / (8 * 255);  // Normalize to 0-1
+              
+              // Combined beat detection
+              const beatStrength = (bassAverage * 0.7) + (midAverage * 0.3);
+              gl.uniform1f(audioFreqLocation, beatStrength);
+
+              // Only switch on very strong beats
+              const currentTime = performance.now();
+              if (beatStrength > BEAT_THRESHOLD && 
+                  currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
+                  lastBeatTime = currentTime;
+                  video.pause();
+                  currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
+                  video.src = videoSources[currentVideoIndex];
+                  video.play();
+              }
           }
 
           // Update video texture
@@ -395,6 +449,75 @@
               await initAudio();
           }
           requestAnimationFrame(render);
+      });
+
+      // Add this event listener after your other event listeners
+      window.addEventListener('keydown', (e) => {
+          // Only allow arrow key controls when not connected to audio
+          if (!audioStream) {
+              switch(e.code) {
+                  case 'ArrowRight':
+                  case 'ArrowDown':
+                      // Next video
+                      video.pause();
+                      currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
+                      video.src = videoSources[currentVideoIndex];
+                      video.play();
+                      break;
+                      
+                  case 'ArrowLeft':
+                  case 'ArrowUp':
+                      // Previous video
+                      video.pause();
+                      currentVideoIndex = (currentVideoIndex - 1 + videoSources.length) % videoSources.length;
+                      video.src = videoSources[currentVideoIndex];
+                      video.play();
+                      break;
+              }
+          }
+      });
+
+      // Add at the top level inside init()
+      const videoControls = document.querySelector('.video-controls');
+      const tempBar = document.querySelector('.temp-bar');
+      const contrastBar = document.querySelector('.contrast-bar');
+      const tempValue = document.querySelector('.temp-value');
+      const contrastValue = document.querySelector('.contrast-value');
+
+      // Show/hide controls based on audio connection
+      const updateControlsVisibility = () => {
+          videoControls.style.display = audioStream ? 'none' : 'block';
+      };
+
+      // Update initial visibility
+      updateControlsVisibility();
+
+      // Handle control bar clicks
+      const handleBarClick = (e, bar, fill, value, isTemp) => {
+          const rect = bar.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+          
+          fill.style.width = `${percentage}%`;
+          value.textContent = `${Math.round(percentage)}%`;
+          
+          if (isTemp) {
+              mouse.x = percentage / 100;
+          } else {
+              mouse.y = percentage / 100;
+          }
+      };
+
+      tempBar.addEventListener('click', (e) => {
+          if (!audioStream) {
+              handleBarClick(e, tempBar, tempBar.querySelector('.temp-fill'), tempValue, true);
+          }
+      });
+
+      contrastBar.addEventListener('click', (e) => {
+          if (!audioStream) {
+              handleBarClick(e, contrastBar, contrastBar.querySelector('.contrast-fill'), contrastValue, false);
+          }
       });
     };
   

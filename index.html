@@ -15,35 +15,89 @@
             display: block;
             width: 100vw;
             height: 100vh;
-        }
-        
-        #startAudio {
             position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 100;
-            padding: 10px 20px;
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid white;
-            color: white;
-            cursor: pointer;
-            font-family: Arial, sans-serif;
-            backdrop-filter: blur(5px);
+            top: 0;
+            left: 0;
         }
-        
-        #startAudio:hover {
-            background: rgba(255, 255, 255, 0.3);
+
+        .audio-controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 9999;
+        }
+
+        .audio-btn {
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 12px 24px;
+            font-size: 10px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            font-weight: 300;
+            min-width: 180px;
+        }
+
+        .video-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            z-index: 9999;
+            color: white;
+            font-family: monospace;
+        }
+
+        .control-bar {
+            width: 100px;
+            height: 4px;
+            background: #333;
+            margin: 5px 0;
+            cursor: pointer;
+        }
+
+        .control-bar-fill {
+            height: 100%;
+            background: white;
+            width: 50%;
         }
     </style>
 </head>
 
 <body>
     <canvas id="glCanvas"></canvas>
-    <button id="startAudio">Start Audio Capture</button>
-    <button id="stopAudio" style="position: fixed; top: 10px; left: 150px; z-index: 100; display: none;">
-        Stop Audio Capture
-    </button>
-    <script type="module" src="script.js"></script>
+    
+    <div class="audio-controls">
+        <button id="startAudio" class="audio-btn">Connect Audio</button>
+        <button id="stopAudio" class="audio-btn" style="display: none;">Disconnect</button>
+    </div>
+
+    <div class="video-controls">
+        <div>
+            <span>TEMP</span>
+            <span class="temp-value">50%</span>
+            <div class="control-bar temp-bar">
+                <div class="control-bar-fill temp-fill"></div>
+            </div>
+        </div>
+        <div>
+            <span>CONT</span>
+            <span class="contrast-value">50%</span>
+            <div class="control-bar contrast-bar">
+                <div class="control-bar-fill contrast-fill"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
 </body>
 
 </html>
