@@ -10,17 +10,17 @@
             overflow: hidden;
             background-color: #000;
         }
-        
+
         #glCanvas {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-    object-fit: cover;
-    position: fixed;
-    top: 0;
-    left: 0;
-    background: black;
-}
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background: black;
+        }
 
         .audio-controls {
             position: fixed;
@@ -71,15 +71,40 @@
             background: white;
             width: 50%;
         }
+
+        /* Add to your CSS */
+        .custom-upload {
+            position: fixed;
+            bottom: 10px;
+            left: 10px;
+            z-index: 9999;
+        }
+
+        .custom-upload label {
+            color: rgba(255, 255, 255, 0.15);
+            font-size: 20px;
+            cursor: pointer;
+            transition: color 0.3s ease;
+            user-select: none;
+        }
+
+        .custom-upload label:hover {
+            color: rgba(255, 255, 255, 0.3);
+        }
     </style>
 </head>
 
 <body>
     <canvas id="glCanvas"></canvas>
-    
+
     <div class="audio-controls">
         <button id="startAudio" class="audio-btn">Connect Audio</button>
         <button id="stopAudio" class="audio-btn" style="display: none;">Disconnect</button>
+    </div>
+    <!-- Add to your HTML -->
+    <div class="custom-upload">
+        <input type="file" id="videoUpload" multiple accept="video/*" style="display: none;">
+        <label for="videoUpload">new media</label>
     </div>
 
     <div class="video-controls">

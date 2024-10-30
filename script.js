@@ -44,7 +44,7 @@
       resizeCanvas();
   
       // Video sources array
-      const videoSources = ['vid/C0008.MP4_Rendered_001.mp4', 'vid/C0016.MP4_Rendered_001.mp4', 'vid/C0014.MP4_Rendered_001.mp4', 'vid/C0022.MP4_Rendered_001.mp4'];
+      let videoSources = ['vid/C0008.MP4_Rendered_001.mp4', 'vid/C0016.MP4_Rendered_001.mp4', 'vid/C0014.MP4_Rendered_001.mp4', 'vid/C0022.MP4_Rendered_001.mp4'];
       let currentVideoIndex = 0;
   
       // Initialize video
@@ -537,6 +537,44 @@
           if (!audioStream) {
               handleBarClick(e, contrastBar, contrastBar.querySelector('.contrast-fill'), contrastValue, false);
           }
+      });
+
+      // Add to your JavaScript initialization
+      const videoUpload = document.getElementById('videoUpload');
+      videoUpload.addEventListener('change', (e) => {
+          const files = Array.from(e.target.files);
+          if (files.length > 0) {
+              // Filter for video files and create object URLs
+              const newVideoSources = files
+                  .filter(file => file.type.startsWith('video/'))
+                  .map(file => URL.createObjectURL(file));
+              
+              if (newVideoSources.length > 0) {
+                  // Clean up old object URLs
+                  videoSources.forEach(url => {
+                      if (url.startsWith('blob:')) {
+                          URL.revokeObjectURL(url);
+                      }
+                  });
+                  
+                  // Update video sources array
+                  videoSources = newVideoSources;
+                  currentVideoIndex = 0;
+                  
+                  // Load first video
+                  video.src = videoSources[currentVideoIndex];
+                  video.play();
+              }
+          }
+      });
+
+      // Add cleanup on page unload
+      window.addEventListener('beforeunload', () => {
+          videoSources.forEach(url => {
+              if (url.startsWith('blob:')) {
+                  URL.revokeObjectURL(url);
+              }
+          });
       });
     };
   
