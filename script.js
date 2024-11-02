@@ -11,6 +11,9 @@
     const BEAT_THRESHOLD = 0.80;  // Higher threshold for only strong beats
     const MIN_BEAT_INTERVAL = 100;  // Shorter interval to allow quick changes on strong beats
   
+    // Add at the top level inside the IIFE
+    let lastVideoTime = 0;
+  
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
       const video = document.createElement('video');
@@ -120,7 +123,7 @@
         updateControlsVisibility();
       });
   
-      // Shader sources
+      // Add shader sources here
       const vertexShaderSource = `
           attribute vec4 a_position;
           attribute vec2 a_texCoord;
@@ -128,19 +131,14 @@
           varying vec2 v_texCoord;
 
           void main() {
-              // Calculate video aspect ratio (assuming 16:9 video)
               float videoAspect = 16.0/9.0;
               float screenAspect = u_resolution.x/u_resolution.y;
-              
               vec2 position = a_position.xy;
               
-              // Adjust position to maintain aspect ratio
               if (screenAspect > videoAspect) {
-                  // Screen is wider than video
                   float scale = screenAspect / videoAspect;
                   position.x /= scale;
               } else {
-                  // Screen is taller than video
                   float scale = videoAspect / screenAspect;
                   position.y /= scale;
               }
@@ -152,96 +150,90 @@
 
       const fragmentShaderSource = `
           precision mediump float;
-
+          
           uniform sampler2D u_videoTexture;
-          uniform vec2 u_resolution;
           uniform vec2 u_mouse;
-          uniform float u_time;
           uniform float u_audioFreq;
-          uniform float u_cursorSpeed;
-          uniform bool u_oldFilmEffect;
-
+          
           varying vec2 v_texCoord;
 
-          // Balanced chromatic aberration effect
-          vec3 chromaticAberration(sampler2D tex, vec2 uv, float strength) {
-              // Medium-high threshold for clear beats
-              float threshold = 0.4;
-              float maxOffset = 0.05;  // Moderate offset amount
+          vec3 sophisticatedContrast(vec3 color, float contrastLevel) {
+              // Store original luminance
+              float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
               
-              vec2 offset = vec2(0.0);
-              if (strength > threshold) {
-                  // Smoother transition with moderate intensity
-                  float normalizedStrength = min((strength - threshold) / (1.0 - threshold), 1.0);
-                  offset = vec2(maxOffset * normalizedStrength, 0.0);
-              }
-
-              float r = texture2D(tex, uv + offset).r;
-              float g = texture2D(tex, uv).g;
-              float b = texture2D(tex, uv - offset).b;
-              return vec3(r, g, b);
+              // Basic contrast adjustment as foundation
+              float basicContrast = mix(0.6, 1.5, contrastLevel);
+              color = pow(color, vec3(basicContrast));
+              
+              // Professional Lift/Gamma/Gain on top
+              float lift = mix(-0.05, 0.02, contrastLevel);
+              float gamma = mix(1.1, 0.9, contrastLevel);
+              float gain = mix(0.95, 1.1, contrastLevel);
+              
+              // Apply LGG adjustments
+              color = pow(max(vec3(0.0), color + lift), vec3(1.0 / gamma)) * gain;
+              
+              // Cinematic highlight rolloff
+              float highlightCompress = mix(1.1, 0.9, contrastLevel);
+              vec3 highlights = smoothstep(0.7, 0.95, color);
+              color = mix(color, pow(color, vec3(highlightCompress)), highlights);
+              
+              // Natural saturation compensation
+              float saturationCompensation = mix(1.1, 0.9, contrastLevel);
+              vec3 desaturated = vec3(dot(color, vec3(0.2126, 0.7152, 0.0722)));
+              color = mix(desaturated, color, saturationCompensation);
+              
+              return color;
           }
 
-          // Enhanced color grading with saturation
           vec3 colorGrade(vec3 color, float temperature, float audioLevel) {
-              // Cool colors (fashion-forward blue/purple)
-              vec3 cool = vec3(0.7, 0.9, 1.1);
-              // Warm colors (luxury gold/amber)
-              vec3 warm = vec3(1.1, 1.0, 0.7);
-            
-              // Mix between cool and warm based on mouse x
-              vec3 colorGrading = mix(cool, warm, temperature);
+              // Your existing color temperature controls
+              vec3 coolHighlights = vec3(0.85, 0.95, 1.15);
+              vec3 coolShadows = vec3(0.85, 0.95, 1.1);
+              vec3 warmHighlights = vec3(1.15, 0.95, 0.85);
+              vec3 warmShadows = vec3(1.1, 0.95, 0.85);
               
-              // Enhance saturation based on audio
-              float saturation = 1.0 + audioLevel * 0.5;
-              vec3 grayscale = vec3(dot(color, vec3(0.299, 0.587, 0.114)));
-              color = mix(grayscale, color, saturation);
+              float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
               
-              return color * colorGrading;
+              vec3 highlights = mix(
+                  coolHighlights,
+                  warmHighlights,
+                  smoothstep(0.2, 0.8, temperature)
+              );
+              
+              vec3 shadows = mix(
+                  coolShadows,
+                  warmShadows,
+                  smoothstep(0.2, 0.8, temperature)
+              );
+              
+              vec3 highlightAdjust = mix(vec3(1.0), highlights, smoothstep(0.4, 0.8, luminance));
+              vec3 shadowAdjust = mix(vec3(1.0), shadows, smoothstep(0.6, 0.2, luminance));
+              
+              color *= highlightAdjust * shadowAdjust;
+              
+              return color;
           }
 
           void main() {
-              vec2 uv = v_texCoord;
-
-              float bassResponse = u_audioFreq * 2.0;
+              vec3 color = texture2D(u_videoTexture, v_texCoord).rgb;
               
-              // Apply chromatic aberration based on audio
-              vec3 color = chromaticAberration(u_videoTexture, uv, 0.3 * bassResponse);
-
-              // Apply color grading
-              color = colorGrade(color, u_mouse.x, bassResponse);
-
-              // Adjust contrast based on mouse Y
-              float contrast = mix(0.8, 2.2, u_mouse.y);
-              color = ((color - 0.5) * contrast) + 0.5;
-
-              // Apply old film effect if toggled
-              if (u_oldFilmEffect) {
-                  float gray = dot(color, vec3(0.299, 0.587, 0.114));
-                  color = vec3(gray);
-
-                  // Add film grain
-                  float grain = fract(sin(dot(uv * u_time * 100.0, vec2(12.9898,78.233))) * 43758.5453);
-                  color += (grain - 0.5) * 0.15;
-
-                  // Add vignette
-                  vec2 position = uv - 0.5;
-                  float vignette = smoothstep(0.8, 0.2, length(position));
-                  color *= vignette;
-              }
-
-              // Final color adjustments
-              color = min(color * 1.1, 1.0);
+              // Apply temperature grading first
+              color = colorGrade(color, u_mouse.x, u_audioFreq);
+              
+              // Apply combined contrast adjustments
+              color = sophisticatedContrast(color, u_mouse.y);
               
               gl_FragColor = vec4(color, 1.0);
           }
       `;
 
-      // Create and compile shaders
+      // Create shader program
       const createShader = (gl, type, source) => {
           const shader = gl.createShader(type);
           gl.shaderSource(shader, source);
           gl.compileShader(shader);
+          
           if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
               console.error(gl.getShaderInfoLog(shader));
               gl.deleteShader(shader);
@@ -252,8 +244,7 @@
 
       const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
       const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-
-      // Create program
+      
       const program = gl.createProgram();
       gl.attachShader(program, vertexShader);
       gl.attachShader(program, fragmentShader);
@@ -434,10 +425,13 @@
               if (beatStrength > BEAT_THRESHOLD && 
                   currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
                   lastBeatTime = currentTime;
+                  lastVideoTime = video.currentTime / video.duration; // Store relative position (0-1)
                   video.pause();
                   currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
                   video.src = videoSources[currentVideoIndex];
-                  video.play();
+                  video.play().then(() => {
+                      video.currentTime = lastVideoTime * video.duration; // Restore relative position
+                  });
               }
           }
 
@@ -468,20 +462,24 @@
               switch(e.code) {
                   case 'ArrowRight':
                   case 'ArrowDown':
-                      // Next video
+                      lastVideoTime = video.currentTime / video.duration;
                       video.pause();
                       currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
                       video.src = videoSources[currentVideoIndex];
-                      video.play();
+                      video.play().then(() => {
+                          video.currentTime = lastVideoTime * video.duration;
+                      });
                       break;
                       
                   case 'ArrowLeft':
                   case 'ArrowUp':
-                      // Previous video
+                      lastVideoTime = video.currentTime / video.duration;
                       video.pause();
                       currentVideoIndex = (currentVideoIndex - 1 + videoSources.length) % videoSources.length;
                       video.src = videoSources[currentVideoIndex];
-                      video.play();
+                      video.play().then(() => {
+                          video.currentTime = lastVideoTime * video.duration;
+                      });
                       break;
               }
           }

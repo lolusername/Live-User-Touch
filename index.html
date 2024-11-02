@@ -6,85 +6,97 @@
     <title>Audio-Reactive Fashion Video</title>
     <style>
         /* Add to your CSS */
-@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&display=swap');
 
-.intro-banner {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    z-index: 10000;
-    text-align: center;
-    animation: fadeOut 2s forwards;
-    pointer-events: none;
-    width: 100%;
-    mix-blend-mode: difference; /* This inverts the colors underneath */
-}
+        .intro-banner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            text-align: center;
+            animation: fadeOut 2s forwards;
+            pointer-events: none;
+            width: 100%;
+            mix-blend-mode: difference;
+            /* This inverts the colors underneath */
+        }
 
-.intro-text {
-    font-family: 'Bodoni Moda', serif;
-    color: white; /* Keep white as base color for difference blend */
-    font-size: clamp(2rem, 15vw, 12rem);
-    line-height: 0.9;
-    font-weight: 700;
-    letter-spacing: -0.02em;
-    text-transform: uppercase;
-    position: relative;
-    margin: 0;
-    padding: 0;
-    opacity: 0;
-    /* Remove previous mix-blend-mode from individual texts */
-}
+        .intro-text {
+            font-family: 'Bodoni Moda', serif;
+            color: white;
+            /* Keep white as base color for difference blend */
+            font-size: clamp(2rem, 15vw, 12rem);
+            line-height: 0.9;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            text-transform: uppercase;
+            position: relative;
+            margin: 0;
+            padding: 0;
+            opacity: 0;
+            /* Remove previous mix-blend-mode from individual texts */
+        }
 
-/* Remove the text shadow effect since it would interfere with inversion */
-.intro-text::after {
-    display: none;
-}
+        /* Remove the text shadow effect since it would interfere with inversion */
+        .intro-text::after {
+            display: none;
+        }
 
-.intro-text:nth-child(1) {
-    animation: slideIn 0.5s forwards;
-}
+        .intro-text:nth-child(1) {
+            animation: slideIn 0.5s forwards;
+        }
 
-.intro-text:nth-child(2) {
-    animation: slideIn 0.5s forwards 0.2s;
-}
+        .intro-text:nth-child(2) {
+            animation: slideIn 0.5s forwards 0.2s;
+        }
 
-.intro-text:nth-child(3) {
-    animation: slideIn 0.5s forwards 0.4s;
-}
+        .intro-text:nth-child(3) {
+            animation: slideIn 0.5s forwards 0.4s;
+        }
 
-@keyframes fadeOut {
-    0% { opacity: 1; }
-    80% { opacity: 1; }
-    100% { opacity: 0; }
-}
+        @keyframes fadeOut {
+            0% {
+                opacity: 1;
+            }
 
-@keyframes slideIn {
-    0% {
-        opacity: 0;
-        transform: translateX(-5%);
-    }
-    100% {
-        opacity: 1;
-        transform: translateX(0);
-    }
-}
+            80% {
+                opacity: 1;
+            }
 
-/* Add dramatic hover effect even though it's brief */
-.intro-text:hover {
-    transform: scale(1.02);
-    transition: transform 0.3s ease;
-}
+            100% {
+                opacity: 0;
+            }
+        }
 
-/* Add subtle text shadow for depth */
-.intro-text::after {
-    content: attr(data-text);
-    position: absolute;
-    left: 0.5rem;
-    top: 0.5rem;
-    color: rgba(255,255,255,0.1);
-    z-index: -1;
-}
+        @keyframes slideIn {
+            0% {
+                opacity: 0;
+                transform: translateX(-5%);
+            }
+
+            100% {
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        /* Add dramatic hover effect even though it's brief */
+        .intro-text:hover {
+            transform: scale(1.02);
+            transition: transform 0.3s ease;
+        }
+
+        /* Add subtle text shadow for depth */
+        .intro-text::after {
+            content: attr(data-text);
+            position: absolute;
+            left: 0.5rem;
+            top: 0.5rem;
+            color: rgba(255, 255, 255, 0.1);
+            z-index: -1;
+        }
+
         body {
             margin: 0;
             overflow: hidden;
@@ -171,17 +183,74 @@
         .custom-upload label:hover {
             color: rgba(255, 255, 255, 0.3);
         }
+
+        .remix-text {
+            font-family: 'Bodoni Moda', serif;
+            position: fixed;
+            top: 0;
+            right: -20px;
+            transform: rotate(90deg);
+            font-size: clamp(1rem, 5vw, 3rem);
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            color: transparent;
+            -webkit-text-stroke: 1px #00ff9d;
+            text-shadow:
+                2px 2px 0 #ff00ff,
+                -2px -2px 0 #00ff9d;
+            opacity: 0;
+            animation: fadeInRemix 0.5s forwards 0.6s;
+            pointer-events: none;
+        }
+
+        @keyframes fadeInRemix {
+            0% {
+                opacity: 0;
+                transform: rotate(90deg) translateY(20px);
+            }
+
+            100% {
+                opacity: 0.8;
+                transform: rotate(90deg) translateY(0);
+            }
+        }
+
+        /* Add hover effect for remix text */
+        .remix-text:hover {
+            animation: glowPulse 2s infinite;
+        }
+
+        @keyframes glowPulse {
+            0% {
+                text-shadow:
+                    2px 2px 0 #ff00ff,
+                    -2px -2px 0 #00ff9d;
+            }
+
+            50% {
+                text-shadow:
+                    2px 2px 10px #ff00ff,
+                    -2px -2px 10px #00ff9d;
+            }
+
+            100% {
+                text-shadow:
+                    2px 2px 0 #ff00ff,
+                    -2px -2px 0 #00ff9d;
+            }
+        }
     </style>
 </head>
 
 <body>
     <canvas id="glCanvas"></canvas>
     <!-- Add to your HTML body -->
-<div class="intro-banner">
-    <div class="intro-text">FILM</div>
-    <div class="intro-text">FASHION</div>
-    <div class="intro-text">MONTAGE</div>
-</div>
+    <div class="intro-banner">
+        <div class="intro-text">FILM</div>
+        <div class="intro-text">FASHION</div>
+        <div class="intro-text">MONTAGE</div>
+        <div class="remix-text">REMIX</div>
+    </div>
 
     <div class="audio-controls">
         <button id="startAudio" class="audio-btn">Connect Audio</button>
