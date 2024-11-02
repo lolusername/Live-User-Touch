@@ -10,9 +10,18 @@
     let lastBeatTime = 0;
     const BEAT_THRESHOLD = 0.80;  // Higher threshold for only strong beats
     const MIN_BEAT_INTERVAL = 100;  // Shorter interval to allow quick changes on strong beats
+    const CHROMATIC_THRESHOLD = 0.80;  // Medium-strong beats threshold
+    let chromaticStrength = 0;  // Will control the effect strength
   
     // Add at the top level inside the IIFE
     let lastVideoTime = 0;
+  
+    // Add these constants at the top
+    const ANALYSIS_INTERVAL = 16; // Only analyze audio every ~16ms (roughly 60fps)
+    let lastAnalysisTime = 0;
+  
+    const MIN_VIDEO_SWITCH_INTERVAL = 500; // ms
+    let lastVideoSwitchTime = 0;
   
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
@@ -31,7 +40,13 @@
     // Main function to initialize and run the application
     const init = async () => {
       const canvas = document.getElementById('glCanvas');
-      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
+      const gl = canvas.getContext('webgl2', { 
+          powerPreference: 'default',
+          antialias: false // Disable antialiasing if not needed
+      }) || canvas.getContext('webgl', {
+          powerPreference: 'default',
+          antialias: false
+      });
   
       if (!gl) {
         console.error('WebGL not supported');
@@ -114,6 +129,15 @@
             sourceNode = null;
         }
 
+        // Close and null out the existing audio context
+        if (audioContext) {
+            audioContext.close();
+            audioContext = null;
+        }
+        
+        // Null out the analyser node as well
+        analyserNode = null;
+
         // Reinitialize audio for video
         initAudio();
 
@@ -154,15 +178,30 @@
           uniform sampler2D u_videoTexture;
           uniform vec2 u_mouse;
           uniform float u_audioFreq;
+          uniform float u_chromaticStrength;
           
           varying vec2 v_texCoord;
+
+          vec3 chromaticAberration(sampler2D tex, vec2 uv, float strength) {
+              float aberration = strength * 0.01;
+              
+              vec2 redOffset = vec2(aberration, 0.0);
+              vec2 greenOffset = vec2(0.0, 0.0);
+              vec2 blueOffset = vec2(-aberration, 0.0);
+              
+              float r = texture2D(tex, uv + redOffset).r;
+              float g = texture2D(tex, uv + greenOffset).g;
+              float b = texture2D(tex, uv + blueOffset).b;
+              
+              return vec3(r, g, b);
+          }
 
           vec3 sophisticatedContrast(vec3 color, float contrastLevel) {
               // Store original luminance
               float luminance = dot(color, vec3(0.2126, 0.7152, 0.0722));
               
               // Basic contrast adjustment as foundation
-              float basicContrast = mix(0.6, 1.5, contrastLevel);
+              float basicContrast = mix(0.6, 1.6, contrastLevel);
               color = pow(color, vec3(basicContrast));
               
               // Professional Lift/Gamma/Gain on top
@@ -216,12 +255,9 @@
           }
 
           void main() {
-              vec3 color = texture2D(u_videoTexture, v_texCoord).rgb;
+              vec3 color = chromaticAberration(u_videoTexture, v_texCoord, u_chromaticStrength);
               
-              // Apply temperature grading first
               color = colorGrade(color, u_mouse.x, u_audioFreq);
-              
-              // Apply combined contrast adjustments
               color = sophisticatedContrast(color, u_mouse.y);
               
               gl_FragColor = vec4(color, 1.0);
@@ -291,6 +327,7 @@
       const audioFreqLocation = gl.getUniformLocation(program, 'u_audioFreq');
       const cursorSpeedLocation = gl.getUniformLocation(program, 'u_cursorSpeed');
       const oldFilmEffectLocation = gl.getUniformLocation(program, 'u_oldFilmEffect');
+      const chromaticStrengthLocation = gl.getUniformLocation(program, 'u_chromaticStrength');
 
       // Create and set up texture
       const videoTexture = gl.createTexture();
@@ -393,46 +430,57 @@
           gl.uniform1f(timeLocation, elapsedTime);
           gl.uniform1f(cursorSpeedLocation, mouse.velocity);
           gl.uniform1i(oldFilmEffectLocation, oldFilmEffect);
+          gl.uniform1f(chromaticStrengthLocation, chromaticStrength);
 
-          // Update audio frequency data
-          if (analyserNode) {
+          // Update audio frequency data - now rate limited
+          if (analyserNode && timestamp - lastAnalysisTime > ANALYSIS_INTERVAL) {
               const frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
               analyserNode.getByteFrequencyData(frequencyData);
               
-              // Focus on bass and mid frequencies for better beat detection
+              // Focus only on the frequencies we need
               let bassSum = 0;
               let midSum = 0;
               
-              // Bass frequencies (first few bins)
-              for (let i = 0; i < 4; i++) {
+              // Reduce number of samples analyzed
+              for (let i = 0; i < 3; i++) {  // Reduced from 4
                   bassSum += frequencyData[i];
               }
               
-              // Mid frequencies (next few bins)
-              for (let i = 4; i < 12; i++) {
+              for (let i = 3; i < 8; i++) {  // Reduced from 12
                   midSum += frequencyData[i];
               }
               
-              const bassAverage = bassSum / (4 * 255); // Normalize to 0-1
-              const midAverage = midSum / (8 * 255);  // Normalize to 0-1
+              const bassAverage = bassSum / (3 * 255);
+              const midAverage = midSum / (5 * 255);
               
-              // Combined beat detection
               const beatStrength = (bassAverage * 0.7) + (midAverage * 0.3);
               gl.uniform1f(audioFreqLocation, beatStrength);
 
-              // Only switch on very strong beats
+              // Handle chromatic aberration
+              if (beatStrength > CHROMATIC_THRESHOLD) {
+                  chromaticStrength = Math.min(chromaticStrength + 0.2, beatStrength);
+              } else {
+                  chromaticStrength *= 0.95;
+              }
+              gl.uniform1f(chromaticStrengthLocation, chromaticStrength);
+
+              // Video switching logic - separate from chromatic aberration
               const currentTime = performance.now();
               if (beatStrength > BEAT_THRESHOLD && 
                   currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
                   lastBeatTime = currentTime;
-                  lastVideoTime = video.currentTime / video.duration; // Store relative position (0-1)
-                  video.pause();
-                  currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
-                  video.src = videoSources[currentVideoIndex];
-                  video.play().then(() => {
-                      video.currentTime = lastVideoTime * video.duration; // Restore relative position
-                  });
+                  
+                  // Switch video if enough time has passed since last switch
+                  if (currentTime - lastVideoSwitchTime > MIN_VIDEO_SWITCH_INTERVAL) {
+                      lastVideoSwitchTime = currentTime;
+                      video.pause();
+                      currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
+                      video.src = videoSources[currentVideoIndex];
+                      video.play();
+                  }
               }
+
+              lastAnalysisTime = timestamp;
           }
 
           // Update video texture

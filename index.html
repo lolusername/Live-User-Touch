@@ -239,6 +239,17 @@
                     -2px -2px 0 #00ff9d;
             }
         }
+
+        .audio-btn-small {
+            font-size: 8px;
+            padding: 8px 16px;
+            min-width: 140px;
+            opacity: 0.6;
+        }
+
+        .audio-btn-small:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 
@@ -255,6 +266,8 @@
     <div class="audio-controls">
         <button id="startAudio" class="audio-btn">Connect Audio</button>
         <button id="stopAudio" class="audio-btn" style="display: none;">Disconnect</button>
+        <button id="startMic" class="audio-btn audio-btn-small">Use Microphone</button>
+        <button id="stopMic" class="audio-btn audio-btn-small" style="display: none;">Stop Microphone</button>
     </div>
     <!-- Add to your HTML -->
     <div class="custom-upload">
