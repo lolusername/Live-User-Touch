@@ -1,4 +1,3 @@
-// IIFE to avoid polluting global scope
 (() => {
     'use strict';
   
@@ -21,6 +20,13 @@
   
     // Add at the top level of your IIFE
     let mediaSources = [];  // Add this line to store both video and image sources
+  
+    // Add this variable at the top with your other declarations
+    let currentTexture = null; // Keep track of current texture source
+    let isImageLoaded = false;
+  
+    // Add these with your other global variables at the top
+    let mediaSizeLocation;
   
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
@@ -55,12 +61,45 @@
       resizeCanvas();
   
       // Video sources array
-      let videoSources = ['vid/C0008.MP4_Rendered_001.mp4', 'vid/C0016.MP4_Rendered_001.mp4', 'vid/C0014.MP4_Rendered_001.mp4', 'vid/C0022.MP4_Rendered_001.mp4'];
+      let videoSources = [
+          'vid/C0008.MP4_Rendered_001.mp4', 
+          'vid/C0016.MP4_Rendered_001.mp4', 
+          'vid/C0014.MP4_Rendered_001.mp4', 
+          'vid/C0022.MP4_Rendered_001.mp4'
+      ];
+
+      // Initialize mediaSources with the default videos
+      mediaSources = videoSources.map(url => ({
+          url: url,
+          type: 'video'
+      }));
+
       let currentVideoIndex = 0;
-  
-      // Initialize video
+
+      // Initialize video with proper event handling
       let video = createVideoElement(videoSources[currentVideoIndex]);
-      video.play();
+      video.addEventListener('loadeddata', () => {
+          isImageLoaded = true;
+          currentTexture = video;
+          gl.useProgram(program);
+          gl.uniform2f(mediaSizeLocation, video.videoWidth, video.videoHeight);
+          gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+          
+          // Set texture parameters
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+
+          // Start the render loop only after the first video is loaded
+          requestAnimationFrame(render);
+      });
+
+      // Make sure video starts playing
+      video.play().catch(err => {
+          console.error('Error playing initial video:', err);
+      });
   
       // Modified initAudio function
       const initAudio = async () => {
@@ -145,18 +184,19 @@
           attribute vec4 a_position;
           attribute vec2 a_texCoord;
           uniform vec2 u_resolution;
+          uniform vec2 u_mediaSize;
           varying vec2 v_texCoord;
 
           void main() {
-              float videoAspect = 16.0/9.0;
+              float mediaAspect = u_mediaSize.x/u_mediaSize.y;
               float screenAspect = u_resolution.x/u_resolution.y;
               vec2 position = a_position.xy;
               
-              if (screenAspect > videoAspect) {
-                  float scale = screenAspect / videoAspect;
+              if (screenAspect > mediaAspect) {
+                  float scale = screenAspect / mediaAspect;
                   position.x /= scale;
               } else {
-                  float scale = videoAspect / screenAspect;
+                  float scale = mediaAspect / screenAspect;
                   position.y /= scale;
               }
               
@@ -465,18 +505,23 @@
               if (beatStrength > BEAT_THRESHOLD && 
                   currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
                   lastBeatTime = currentTime;
-                  lastVideoTime = video.currentTime / video.duration; // Store relative position (0-1)
-                  video.pause();
-                  currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
-                  video.src = videoSources[currentVideoIndex];
-                  video.play().then(() => {
-                      video.currentTime = lastVideoTime * video.duration; // Restore relative position
-                  });
+                  
+                  // Use loadMedia instead of directly manipulating video
+                  const nextIndex = (currentVideoIndex + 1) % mediaSources.length;
+                  
+                  // Don't try to play if it's an image
+                  if (mediaSources[nextIndex].type === 'image') {
+                      isImageLoaded = false;
+                      loadMedia(nextIndex);
+                  } else {
+                      // For videos, use the existing loadMedia function
+                      loadMedia(nextIndex);
+                  }
               }
           }
 
-          // Update video texture
-          if (video.readyState >= video.HAVE_CURRENT_DATA) {
+          // Only update texture from video if current media is video and video is ready
+          if (mediaSources[currentVideoIndex]?.type === 'video' && video.readyState >= video.HAVE_CURRENT_DATA) {
               gl.bindTexture(gl.TEXTURE_2D, videoTexture);
               gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
           }
@@ -499,27 +544,18 @@
       window.addEventListener('keydown', (e) => {
           // Only allow arrow key controls when not connected to audio
           if (!audioStream) {
+              let newIndex;
               switch(e.code) {
                   case 'ArrowRight':
                   case 'ArrowDown':
-                      lastVideoTime = video.currentTime / video.duration;
-                      video.pause();
-                      currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
-                      video.src = videoSources[currentVideoIndex];
-                      video.play().then(() => {
-                          video.currentTime = lastVideoTime * video.duration;
-                      });
+                      newIndex = (currentVideoIndex + 1) % mediaSources.length;
+                      loadMedia(newIndex);
                       break;
                       
                   case 'ArrowLeft':
                   case 'ArrowUp':
-                      lastVideoTime = video.currentTime / video.duration;
-                      video.pause();
-                      currentVideoIndex = (currentVideoIndex - 1 + videoSources.length) % videoSources.length;
-                      video.src = videoSources[currentVideoIndex];
-                      video.play().then(() => {
-                          video.currentTime = lastVideoTime * video.duration;
-                      });
+                      newIndex = (currentVideoIndex - 1 + mediaSources.length) % mediaSources.length;
+                      loadMedia(newIndex);
                       break;
               }
           }
@@ -627,28 +663,100 @@
 
       // Update the loadMedia function
       function loadMedia(index) {
+          if (!mediaSources || !mediaSources.length) {
+              console.warn('No media sources available');
+              return;
+          }
+
+          if (index < 0 || index >= mediaSources.length) {
+              console.warn('Invalid media index');
+              return;
+          }
+
           const media = mediaSources[index];
+          isImageLoaded = false; // Reset flag
           
-          if (media.type === 'video') {
-              // Store current video's timestamp before switching
-              if (video.src) {
-                  const currentVideoKey = videoSources[currentVideoIndex];
-                  videoTimestamps.set(currentVideoKey, video.currentTime);
+          try {
+              if (media.type === 'video') {
+                  // Reset video element
+                  video.pause();
+                  video.currentTime = 0;
+                  
+                  // Set new source
+                  video.src = media.url;
+                  video.style.display = 'block';
+                  currentTexture = video;
+                  
+                  // Set up video event listeners
+                  video.onloadeddata = () => {
+                      isImageLoaded = true;
+                      // Initialize texture with first frame
+                      gl.useProgram(program);
+                      gl.uniform2f(mediaSizeLocation, video.videoWidth, video.videoHeight);
+                      gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+                      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+                      
+                      // Set texture parameters
+                      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                  };
+
+                  video.onerror = (err) => {
+                      console.error('Error loading video:', err);
+                      isImageLoaded = false;
+                  };
+
+                  // Start playing
+                  const playPromise = video.play();
+                  if (playPromise !== undefined) {
+                      playPromise.catch(err => {
+                          console.error('Error playing video:', err);
+                      });
+                  }
+              } else if (media.type === 'image') {
+                  // For images
+                  video.pause();
+                  video.src = '';
+                  video.load();
+                  video.style.display = 'none';
+                  
+                  const img = new Image();
+                  img.crossOrigin = 'anonymous';
+                  
+                  img.onerror = (err) => {
+                      console.error('Error loading image:', err);
+                      isImageLoaded = false;
+                  };
+                  
+                  img.onload = () => {
+                      try {
+                          isImageLoaded = true;
+                          currentTexture = img;
+                          gl.useProgram(program);
+                          gl.uniform2f(mediaSizeLocation, img.naturalWidth, img.naturalHeight);
+                          gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+                          gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+                          
+                          // Set texture parameters
+                          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+                          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+                          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+                          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+                      } catch (err) {
+                          console.error('Error binding image to texture:', err);
+                          isImageLoaded = false;
+                      }
+                  };
+                  
+                  img.src = media.url;
               }
               
-              video.src = media.url;
-              video.play().catch(console.error);
-          } else {
-              // Handle image
-              const img = new Image();
-              img.onload = () => {
-                  gl.bindTexture(gl.TEXTURE_2D, videoTexture);
-                  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
-              };
-              img.src = media.url;
+              currentVideoIndex = index;
+          } catch (err) {
+              console.error('Error in loadMedia:', err);
           }
-          
-          currentVideoIndex = index;
       }
 
       // Add video ended handler to restart video
@@ -669,6 +777,9 @@
 
       // Make sure video is ready to seek
       video.preload = 'auto';
+
+      // After creating and linking your shader program, add this line
+      mediaSizeLocation = gl.getUniformLocation(program, 'u_mediaSize');
     };
   
     // Run the application
