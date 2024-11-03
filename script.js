@@ -692,19 +692,22 @@
               return;
           }
 
-          if (index < 0 || index >= mediaSources.length) {
-              console.warn('Invalid media index');
-              return;
-          }
-
           const media = mediaSources[index];
-          isImageLoaded = false; // Reset flag
+          isImageLoaded = false;
           
           try {
               if (media.type === 'video') {
+                  // Save current video timestamp before switching
+                  if (video.src) {
+                      const currentFileName = video.src.split('/').pop();  // Get just the filename
+                      videoTimestamps.set(
+                          currentFileName, 
+                          video.currentTime / video.duration
+                      );
+                  }
+                  
                   // Reset video element
                   video.pause();
-                  video.currentTime = 0;
                   
                   // Set new source
                   video.src = media.url;
@@ -714,36 +717,28 @@
                   // Set up video event listeners
                   video.onloadeddata = () => {
                       isImageLoaded = true;
-                      // Initialize texture with first frame
-                      gl.useProgram(program);
+                      
+                      // Restore timestamp if it exists
+                      const newFileName = media.url.split('/').pop();
+                      const savedTimePercentage = videoTimestamps.get(newFileName);
+                      
+                      // Initialize texture first
                       gl.uniform2f(mediaSizeLocation, video.videoWidth, video.videoHeight);
                       gl.bindTexture(gl.TEXTURE_2D, videoTexture);
                       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
                       
-                      // Set texture parameters
                       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
                       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
                       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
                       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-                  };
-
-                  // Only log video errors when we're actually trying to load a video
-                  video.onerror = (err) => {
-                      if (media.type === 'video' && currentTexture === video) {
-                          console.error('Error loading video:', err);
-                          isImageLoaded = false;
+                      
+                      // Set time and play after texture is initialized
+                      if (savedTimePercentage !== undefined) {
+                          video.currentTime = savedTimePercentage * video.duration;
                       }
+                      
+                      video.play().catch(console.error);
                   };
-
-                  // Only try to play if it's a video
-                  const playPromise = video.play();
-                  if (playPromise !== undefined) {
-                      playPromise.catch(err => {
-                          if (media.type === 'video') {  // Add this check
-                              console.error('Error playing video:', err);
-                          }
-                      });
-                  }
               } else if (media.type === 'image') {
                   // For images
                   video.pause();
@@ -788,19 +783,19 @@
           }
       }
 
-      // Add video ended handler to restart video
+      // Update video ended handler (around line 787-792)
       video.addEventListener('ended', () => {
-          const currentVideoKey = videoSources[currentVideoIndex];
-          videoTimestamps.set(currentVideoKey, 0); // Reset timestamp
+          const fileName = video.src.split('/').pop();
+          videoTimestamps.set(fileName, 0);  // Reset timestamp when video ends
           video.currentTime = 0;
           video.play();
       });
 
-      // Debug helper - log all timestamps
+      // Debug helper
       function logTimestamps() {
           console.log('Current timestamps:');
           videoTimestamps.forEach((time, url) => {
-              console.log(url, ':', time);
+              console.log(url, ':', Math.round(time * 100) + '%');
           });
       }
 
