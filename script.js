@@ -28,6 +28,23 @@
     // Add these with your other global variables at the top
     let mediaSizeLocation;
   
+    // Add these state tracking variables at the top (around line 5-7)
+    let isAudioInitialized = false;
+    let isAudioConnected = false;
+    let reconnectAttempts = 0;
+    const MAX_RECONNECT_ATTEMPTS = 3;
+  
+    // Add this helper function to safely disconnect nodes
+    function safeDisconnectNode(node) {
+        if (node) {
+            try {
+                node.disconnect();
+            } catch (err) {
+                console.log('Node already disconnected');
+            }
+        }
+    }
+  
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
       const video = document.createElement('video');
@@ -103,25 +120,46 @@
   
       // Modified initAudio function
       const initAudio = async () => {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
-        
-        if (!analyserNode) {
-            analyserNode = audioContext.createAnalyser();
-            analyserNode.fftSize = 256;
-        }
-        
-        // Only create new source node if we don't have one AND we're not using audioStream
-        if (!sourceNode && video && !audioStream) {
-            sourceNode = audioContext.createMediaElementSource(video);
-            sourceNode.connect(analyserNode);
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                await audioContext.resume();
+            }
+            
+            if (!analyserNode) {
+                analyserNode = audioContext.createAnalyser();
+                analyserNode.fftSize = 256;
+            }
+            
+            if (!sourceNode && video && !audioStream) {
+                sourceNode = audioContext.createMediaElementSource(video);
+                sourceNode.connect(analyserNode);
+            }
+            
+            return true;
+        } catch (err) {
+            console.error('Audio initialization failed:', err);
+            return false;
         }
       };
   
       // Modified audio capture button listeners
       document.getElementById('startAudio').addEventListener('click', async () => {
         try {
+            // Clean up existing connections first
+            if (sourceNode) {
+                safeDisconnectNode(sourceNode);
+                sourceNode = null;
+            }
+            if (analyserNode) {
+                safeDisconnectNode(analyserNode);
+                analyserNode = null;
+            }
+
+            // Create new analyzer
+            analyserNode = audioContext.createAnalyser();
+            analyserNode.fftSize = 256;
+
             const stream = await navigator.mediaDevices.getDisplayMedia({ 
                 video: true,
                 audio: true 
@@ -129,10 +167,6 @@
             
             const audioTrack = stream.getAudioTracks()[0];
             if (audioTrack) {
-                if (sourceNode) {
-                    sourceNode.disconnect();
-                }
-                
                 audioStream = new MediaStream([audioTrack]);
                 sourceNode = audioContext.createMediaStreamSource(audioStream);
                 sourceNode.connect(analyserNode);
@@ -145,6 +179,11 @@
             
         } catch (error) {
             console.error('Error starting audio capture:', error);
+            // Reset nodes on error
+            sourceNode = null;
+            analyserNode = null;
+            document.getElementById('startAudio').style.display = 'block';
+            document.getElementById('stopAudio').style.display = 'none';
         }
         updateControlsVisibility();
       });
@@ -155,27 +194,15 @@
             audioStream.getTracks().forEach(track => track.stop());
             audioStream = null;
         }
-
-        if (sourceNode) {
-            sourceNode.disconnect();
-            sourceNode = null;
-        }
-
-        // Close and null out the existing audio context
-        if (audioContext) {
-            audioContext.close();
-            audioContext = null;
-        }
         
-        // Null out the analyser node as well
+        safeDisconnectNode(sourceNode);
+        sourceNode = null;
+        
+        safeDisconnectNode(analyserNode);
         analyserNode = null;
-
-        // Reinitialize audio for video
-        initAudio();
-
+        
         document.getElementById('startAudio').style.display = 'block';
         document.getElementById('stopAudio').style.display = 'none';
-        
         updateControlsVisibility();
       });
   
@@ -506,15 +533,12 @@
                   currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
                   lastBeatTime = currentTime;
                   
-                  // Use loadMedia instead of directly manipulating video
                   const nextIndex = (currentVideoIndex + 1) % mediaSources.length;
                   
                   // Don't try to play if it's an image
                   if (mediaSources[nextIndex].type === 'image') {
-                      isImageLoaded = false;
                       loadMedia(nextIndex);
                   } else {
-                      // For videos, use the existing loadMedia function
                       loadMedia(nextIndex);
                   }
               }
@@ -703,16 +727,21 @@
                       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
                   };
 
+                  // Only log video errors when we're actually trying to load a video
                   video.onerror = (err) => {
-                      console.error('Error loading video:', err);
-                      isImageLoaded = false;
+                      if (media.type === 'video' && currentTexture === video) {
+                          console.error('Error loading video:', err);
+                          isImageLoaded = false;
+                      }
                   };
 
-                  // Start playing
+                  // Only try to play if it's a video
                   const playPromise = video.play();
                   if (playPromise !== undefined) {
                       playPromise.catch(err => {
-                          console.error('Error playing video:', err);
+                          if (media.type === 'video') {  // Add this check
+                              console.error('Error playing video:', err);
+                          }
                       });
                   }
               } else if (media.type === 'image') {
