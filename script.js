@@ -16,12 +16,11 @@
     // Add at the top level inside the IIFE
     let lastVideoTime = 0;
   
-    // Add these constants at the top
-    const ANALYSIS_INTERVAL = 16; // Only analyze audio every ~16ms (roughly 60fps)
-    let lastAnalysisTime = 0;
+    // Add at the top level inside the IIFE
+    const videoTimestamps = new Map(); // Stores the last timestamp for each video URL
   
-    const MIN_VIDEO_SWITCH_INTERVAL = 500; // ms
-    let lastVideoSwitchTime = 0;
+    // Add at the top level of your IIFE
+    let mediaSources = [];  // Add this line to store both video and image sources
   
     // Functional helper to create and configure a video element
     const createVideoElement = (src) => {
@@ -40,13 +39,7 @@
     // Main function to initialize and run the application
     const init = async () => {
       const canvas = document.getElementById('glCanvas');
-      const gl = canvas.getContext('webgl2', { 
-          powerPreference: 'default',
-          antialias: false // Disable antialiasing if not needed
-      }) || canvas.getContext('webgl', {
-          powerPreference: 'default',
-          antialias: false
-      });
+      const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
   
       if (!gl) {
         console.error('WebGL not supported');
@@ -432,55 +425,54 @@
           gl.uniform1i(oldFilmEffectLocation, oldFilmEffect);
           gl.uniform1f(chromaticStrengthLocation, chromaticStrength);
 
-          // Update audio frequency data - now rate limited
-          if (analyserNode && timestamp - lastAnalysisTime > ANALYSIS_INTERVAL) {
+          // Update audio frequency data
+          if (analyserNode) {
               const frequencyData = new Uint8Array(analyserNode.frequencyBinCount);
               analyserNode.getByteFrequencyData(frequencyData);
               
-              // Focus only on the frequencies we need
+              // Focus on bass and mid frequencies for better beat detection
               let bassSum = 0;
               let midSum = 0;
               
-              // Reduce number of samples analyzed
-              for (let i = 0; i < 3; i++) {  // Reduced from 4
+              // Bass frequencies (first few bins)
+              for (let i = 0; i < 4; i++) {
                   bassSum += frequencyData[i];
               }
               
-              for (let i = 3; i < 8; i++) {  // Reduced from 12
+              // Mid frequencies (next few bins)
+              for (let i = 4; i < 12; i++) {
                   midSum += frequencyData[i];
               }
               
-              const bassAverage = bassSum / (3 * 255);
-              const midAverage = midSum / (5 * 255);
+              const bassAverage = bassSum / (4 * 255); // Normalize to 0-1
+              const midAverage = midSum / (8 * 255);  // Normalize to 0-1
               
+              // Combined beat detection
               const beatStrength = (bassAverage * 0.7) + (midAverage * 0.3);
               gl.uniform1f(audioFreqLocation, beatStrength);
 
-              // Handle chromatic aberration
+              // Update chromatic aberration strength
               if (beatStrength > CHROMATIC_THRESHOLD) {
-                  chromaticStrength = Math.min(chromaticStrength + 0.2, beatStrength);
+                  chromaticStrength = beatStrength;
               } else {
-                  chromaticStrength *= 0.95;
+                  // Decay the effect
+                  chromaticStrength *= 0.9;
               }
               gl.uniform1f(chromaticStrengthLocation, chromaticStrength);
 
-              // Video switching logic - separate from chromatic aberration
+              // Only switch on very strong beats
               const currentTime = performance.now();
               if (beatStrength > BEAT_THRESHOLD && 
                   currentTime - lastBeatTime > MIN_BEAT_INTERVAL) {
                   lastBeatTime = currentTime;
-                  
-                  // Switch video if enough time has passed since last switch
-                  if (currentTime - lastVideoSwitchTime > MIN_VIDEO_SWITCH_INTERVAL) {
-                      lastVideoSwitchTime = currentTime;
-                      video.pause();
-                      currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
-                      video.src = videoSources[currentVideoIndex];
-                      video.play();
-                  }
+                  lastVideoTime = video.currentTime / video.duration; // Store relative position (0-1)
+                  video.pause();
+                  currentVideoIndex = (currentVideoIndex + 1) % videoSources.length;
+                  video.src = videoSources[currentVideoIndex];
+                  video.play().then(() => {
+                      video.currentTime = lastVideoTime * video.duration; // Restore relative position
+                  });
               }
-
-              lastAnalysisTime = timestamp;
           }
 
           // Update video texture
@@ -577,33 +569,41 @@
       });
 
       // Add to your JavaScript initialization
-      const videoUpload = document.getElementById('videoUpload');
-      videoUpload.addEventListener('change', (e) => {
-          const files = Array.from(e.target.files);
-          if (files.length > 0) {
-              // Filter for video files and create object URLs
-              const newVideoSources = files
-                  .filter(file => file.type.startsWith('video/'))
-                  .map(file => URL.createObjectURL(file));
+      const mediaUpload = document.getElementById('mediaUpload');
+      if (mediaUpload) {
+          mediaUpload.addEventListener('change', (e) => {
+              const files = Array.from(e.target.files);
               
-              if (newVideoSources.length > 0) {
-                  // Clean up old object URLs
-                  videoSources.forEach(url => {
-                      if (url.startsWith('blob:')) {
-                          URL.revokeObjectURL(url);
-                      }
-                  });
+              if (files.length > 0) {
+                  // Filter for both video and image files
+                  const newMediaSources = files
+                      .filter(file => file.type.startsWith('video/') || file.type.startsWith('image/'))
+                      .map(file => ({
+                          url: URL.createObjectURL(file),
+                          type: file.type.startsWith('video/') ? 'video' : 'image'
+                      }));
                   
-                  // Update video sources array
-                  videoSources = newVideoSources;
-                  currentVideoIndex = 0;
-                  
-                  // Load first video
-                  video.src = videoSources[currentVideoIndex];
-                  video.play();
+                  if (newMediaSources.length > 0) {
+                      // Clean up old object URLs
+                      videoSources.forEach(url => {
+                          if (url.startsWith('blob:')) {
+                              URL.revokeObjectURL(url);
+                          }
+                      });
+                      
+                      // Store all media sources
+                      mediaSources = newMediaSources;
+                      videoSources = newMediaSources.map(media => media.url);
+                      currentVideoIndex = 0;
+                      
+                      // Load first media
+                      loadMedia(0);
+                  }
               }
-          }
-      });
+          });
+      } else {
+          console.log('Upload element not found');
+      }
 
       // Add cleanup on page unload
       window.addEventListener('beforeunload', () => {
@@ -624,6 +624,51 @@
               }
           }, 2500); // Slightly longer than animation to ensure smooth fade
       });
+
+      // Update the loadMedia function
+      function loadMedia(index) {
+          const media = mediaSources[index];
+          
+          if (media.type === 'video') {
+              // Store current video's timestamp before switching
+              if (video.src) {
+                  const currentVideoKey = videoSources[currentVideoIndex];
+                  videoTimestamps.set(currentVideoKey, video.currentTime);
+              }
+              
+              video.src = media.url;
+              video.play().catch(console.error);
+          } else {
+              // Handle image
+              const img = new Image();
+              img.onload = () => {
+                  gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+                  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, img);
+              };
+              img.src = media.url;
+          }
+          
+          currentVideoIndex = index;
+      }
+
+      // Add video ended handler to restart video
+      video.addEventListener('ended', () => {
+          const currentVideoKey = videoSources[currentVideoIndex];
+          videoTimestamps.set(currentVideoKey, 0); // Reset timestamp
+          video.currentTime = 0;
+          video.play();
+      });
+
+      // Debug helper - log all timestamps
+      function logTimestamps() {
+          console.log('Current timestamps:');
+          videoTimestamps.forEach((time, url) => {
+              console.log(url, ':', time);
+          });
+      }
+
+      // Make sure video is ready to seek
+      video.preload = 'auto';
     };
   
     // Run the application
