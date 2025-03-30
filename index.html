@@ -1,298 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
-    <title>Audio-Reactive Fashion Video</title>
-    <style>
-        /* Add to your CSS */
-        @import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&display=swap');
-
-        .intro-banner {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 10000;
-            text-align: center;
-            animation: fadeOut 2s forwards;
-            pointer-events: none;
-            width: 100%;
-            mix-blend-mode: difference;
-            /* This inverts the colors underneath */
-        }
-
-        .intro-text {
-            font-family: 'Bodoni Moda', serif;
-            color: white;
-            /* Keep white as base color for difference blend */
-            font-size: clamp(2rem, 15vw, 12rem);
-            line-height: 0.9;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            text-transform: uppercase;
-            position: relative;
-            margin: 0;
-            padding: 0;
-            opacity: 0;
-            /* Remove previous mix-blend-mode from individual texts */
-        }
-
-        /* Remove the text shadow effect since it would interfere with inversion */
-        .intro-text::after {
-            display: none;
-        }
-
-        .intro-text:nth-child(1) {
-            animation: slideIn 0.5s forwards;
-        }
-
-        .intro-text:nth-child(2) {
-            animation: slideIn 0.5s forwards 0.2s;
-        }
-
-        .intro-text:nth-child(3) {
-            animation: slideIn 0.5s forwards 0.4s;
-        }
-
-        @keyframes fadeOut {
-            0% {
-                opacity: 1;
-            }
-
-            80% {
-                opacity: 1;
-            }
-
-            100% {
-                opacity: 0;
-            }
-        }
-
-        @keyframes slideIn {
-            0% {
-                opacity: 0;
-                transform: translateX(-5%);
-            }
-
-            100% {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-
-        /* Add dramatic hover effect even though it's brief */
-        .intro-text:hover {
-            transform: scale(1.02);
-            transition: transform 0.3s ease;
-        }
-
-        /* Add subtle text shadow for depth */
-        .intro-text::after {
-            content: attr(data-text);
-            position: absolute;
-            left: 0.5rem;
-            top: 0.5rem;
-            color: rgba(255, 255, 255, 0.1);
-            z-index: -1;
-        }
-
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-        }
-
-        #glCanvas {
-            display: block;
-            width: 100vw;
-            height: 100vh;
-            object-fit: cover;
-            position: fixed;
-            top: 0;
-            left: 0;
-            background: black;
-        }
-
-        .audio-controls {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            z-index: 9999;
-        }
-
-        .audio-btn {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: white;
-            padding: 12px 24px;
-            font-size: 10px;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            cursor: pointer;
-            transition: all 0.6s ease;
-            backdrop-filter: blur(5px);
-            font-weight: 300;
-            min-width: 180px;
-        }
-
-        .video-controls {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 10px;
-            z-index: 9999;
-            color: white;
-            font-family: monospace;
-        }
-
-        .control-bar {
-            width: 100px;
-            height: 4px;
-            background: #333;
-            margin: 5px 0;
-            cursor: pointer;
-        }
-
-        .control-bar-fill {
-            height: 100%;
-            background: white;
-            width: 50%;
-        }
-
-        /* Add to your CSS */
-        .custom-upload {
-            position: fixed;
-            bottom: 10px;
-            left: 10px;
-            z-index: 9999;
-        }
-
-        .custom-upload label {
-            color: rgba(255, 255, 255, 0.15);
-            font-size: 20px;
-            cursor: pointer;
-            transition: color 0.3s ease;
-            user-select: none;
-        }
-
-        .custom-upload label:hover {
-            color: rgba(255, 255, 255, 0.3);
-        }
-
-        .remix-text {
-            font-family: 'Bodoni Moda', serif;
-            position: fixed;
-            top: 0;
-            right: -20px;
-            transform: rotate(90deg);
-            font-size: clamp(1rem, 5vw, 3rem);
-            text-transform: uppercase;
-            letter-spacing: 0.2em;
-            color: transparent;
-            -webkit-text-stroke: 1px #00ff9d;
-            text-shadow:
-                2px 2px 0 #ff00ff,
-                -2px -2px 0 #00ff9d;
-            opacity: 0;
-            animation: fadeInRemix 0.5s forwards 0.6s;
-            pointer-events: none;
-        }
-
-        @keyframes fadeInRemix {
-            0% {
-                opacity: 0;
-                transform: rotate(90deg) translateY(20px);
-            }
-
-            100% {
-                opacity: 0.8;
-                transform: rotate(90deg) translateY(0);
-            }
-        }
-
-        /* Add hover effect for remix text */
-        .remix-text:hover {
-            animation: glowPulse 2s infinite;
-        }
-
-        @keyframes glowPulse {
-            0% {
-                text-shadow:
-                    2px 2px 0 #ff00ff,
-                    -2px -2px 0 #00ff9d;
-            }
-
-            50% {
-                text-shadow:
-                    2px 2px 10px #ff00ff,
-                    -2px -2px 10px #00ff9d;
-            }
-
-            100% {
-                text-shadow:
-                    2px 2px 0 #ff00ff,
-                    -2px -2px 0 #00ff9d;
-            }
-        }
-
-        .audio-btn-small {
-            font-size: 8px;
-            padding: 8px 16px;
-            min-width: 140px;
-            opacity: 0.6;
-        }
-
-        .audio-btn-small:hover {
-            opacity: 1;
-        }
-    </style>
+    <title>Fashion Video</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="styles.css">
 </head>
-
 <body>
-    <canvas id="glCanvas"></canvas>
-    <!-- Add to your HTML body -->
+    <div class="canvas-container">
+        <canvas id="glCanvas"></canvas>
+    </div>
     <div class="intro-banner">
         <div class="intro-text">FILM</div>
         <div class="intro-text">FASHION</div>
         <div class="intro-text">MONTAGE</div>
-        <div class="remix-text">REMIX</div>
     </div>
 
-    <div class="audio-controls">
-        <button id="startAudio" class="audio-btn">Connect Audio</button>
-        <button id="stopAudio" class="audio-btn" style="display: none;">Disconnect</button>
-        <button id="startMic" class="audio-btn audio-btn-small">Use Microphone</button>
-        <button id="stopMic" class="audio-btn audio-btn-small" style="display: none;">Stop Microphone</button>
-    </div>
-    <!-- Add to your HTML -->
-    <div class="custom-upload">
-        <input type="file" id="mediaUpload" multiple accept="video/*,image/*" style="display: none;">
-        <label for="mediaUpload">new media</label>
+    <div id="spaceOptions" style="display: none;" class="mode-selection">
+        <button class="mode-btn" id="useWebcamSpace">USE WEBCAM</button>
+        <button class="mode-btn" id="uploadVideoSpace">UPLOAD VIDEO</button>
+        <input type="file" id="mediaUpload" accept="video/*,image/*" style="display: none;">
     </div>
 
-    <div class="video-controls">
-        <div>
-            <span>COLOR TEMP</span>
-            <span class="temp-value">50%</span>
-            <div class="control-bar temp-bar">
-                <div class="control-bar-fill temp-fill"></div>
-            </div>
+    <div id="webcamContainer">
+        <video id="webcamVideo" autoplay playsinline></video>
+    </div>
+
+    <div class="avant-garde-note">
+        <div class="avant-garde-line"></div>
+        <div class="avant-garde-text">
+            <span class="avant-garde-label">INTERACTION</span>
+            <span class="avant-garde-value">HORIZONTAL → TEMPERATURE</span>
+            <span class="avant-garde-value">VERTICAL → CONTRAST</span>
+            <span class="avant-garde-value">← → CYCLE VIDEOS</span>
         </div>
-        <div>
-            <span>CONTRAST</span>
-            <span class="contrast-value">50%</span>
-            <div class="control-bar contrast-bar">
-                <div class="control-bar-fill contrast-fill"></div>
-            </div>
-        </div>
+        <div class="avant-garde-line"></div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script-functional.js"></script>
 </body>
-
-</html>
+</html> 
