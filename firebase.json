@@ -1,0 +1,11 @@
+{
+  "hosting": {
+    "site": "fashion-film-montage",
+    "public": "/",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ]
+  }
+}

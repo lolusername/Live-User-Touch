@@ -1,3 +1,307 @@
+@import url('https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@700&display=swap');
+
+/* Base styles using CSS custom properties for reactive values */
+:root {
+    --banner-opacity: 1;
+    --text-slide: -5%;
+}
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #000;
+}
+
+#glCanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: black;
+}
+
+/* Functional class names following BEM methodology */
+.intro-banner {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10000;
+    text-align: center;
+    width: 100%;
+    mix-blend-mode: difference;
+    opacity: var(--banner-opacity);
+    transition: opacity 2s;
+}
+
+.intro-text {
+    font-family: 'Bodoni Moda', serif;
+    color: white;
+    font-size: clamp(2rem, 15vw, 12rem);
+    line-height: 0.9;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    text-transform: uppercase;
+    position: relative;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    transform: translateX(var(--text-slide));
+    transition: transform 0.5s, opacity 0.5s;
+}
+
+.intro-text--visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.audio-controls {
+    position: fixed;
+    z-index: 10001;
+}
+
+.audio-controls--audio {
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.audio-controls--video {
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    color: white;
+    font-family: monospace;
+}
+
+.audio-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 24px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.6s ease;
+    backdrop-filter: blur(5px);
+    font-weight: 300;
+    min-width: 180px;
+}
+
+.audio-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.audio-btn-small {
+    font-size: 8px;
+    padding: 8px 16px;
+    min-width: 140px;
+    opacity: 0.6;
+}
+
+.audio-btn-small:hover {
+    opacity: 1;
+}
+
+.control-bar {
+    width: 100px;
+    height: 4px;
+    background: #333;
+    margin: 5px 0;
+    cursor: pointer;
+}
+
+.control-bar__fill {
+    height: 100%;
+    background: white;
+    width: 50%;
+    transition: width 0.3s;
+}
+
+.custom-upload {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    z-index: 9999;
+}
+
+.custom-upload__label {
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 20px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+    user-select: none;
+}
+
+.custom-upload__label:hover {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.remix-text {
+    font-family: 'Bodoni Moda', serif;
+    position: fixed;
+    top: 0;
+    right: -20px;
+    transform: rotate(90deg) translateY(20px);
+    font-size: clamp(1rem, 5vw, 3rem);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: transparent;
+    -webkit-text-stroke: 1px #00ff9d;
+    text-shadow: 2px 2px 0 #ff00ff, -2px -2px 0 #00ff9d;
+    opacity: 0;
+    transition: transform 0.5s, opacity 0.5s;
+}
+
+.remix-text--visible {
+    opacity: 0.8;
+    transform: rotate(90deg) translateY(0);
+}
+
+.video-controls {
+    position: fixed;
+    z-index: 10001;
+}
+
+.video-controls--video {
+    bottom: 20px;
+    right: 20px;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    color: white;
+    font-family: monospace;
+}
+
+.temp-value {
+    margin-left: 10px;
+}
+
+.temp-bar {
+    background: #333;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.temp-fill {
+    height: 100%;
+    background: white;
+    width: 50%;
+    transition: width 0.3s;
+}
+
+.contrast-value {
+    margin-left: 10px;
+}
+
+.contrast-bar {
+    background: #333;
+    height: 4px;
+    border-radius: 2px;
+    overflow: hidden;
+}
+
+.contrast-fill {
+    height: 100%;
+    background: white;
+    width: 50%;
+    transition: width 0.3s;
+}
+
+/* Capture button styling */
+.capture-btn-container {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10001;
+}
+
+.capture-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 24px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.6s ease;
+    backdrop-filter: blur(5px);
+    font-weight: 300;
+    min-width: 180px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+}
+
+.capture-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.capture-icon {
+    font-size: 12px;
+}
+
+.capture-text {
+    font-family: monospace;
+}
+
+/* Mode selection styling */
+.mode-selection {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 10001;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mode-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 24px;
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.6s ease;
+    backdrop-filter: blur(5px);
+    font-weight: 300;
+    min-width: 180px;
+    font-family: monospace;
+}
+
+.mode-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Webcam container styling */
+#webcamContainer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 50%;
+    height: 100%;
+    z-index: 1;
+    display: none;
+}
+
+#webcamVideo {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
 .mobile-guide {
     position: fixed;
     bottom: 140px;
@@ -72,5 +376,111 @@
         padding: 30px 40px;
         width: 80%;
         max-width: 400px;
+    }
+}
+
+.avant-garde-note {
+    position: fixed;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    z-index: 1000;
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+    backdrop-filter: blur(10px);
+    padding: 30px 40px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.avant-garde-line {
+    width: 100%;
+    height: 1px;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.3) 20%, 
+        rgba(255, 255, 255, 0.3) 80%, 
+        transparent 100%
+    );
+}
+
+.avant-garde-text {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    font-family: 'Bodoni Moda', serif;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    letter-spacing: 0.1em;
+}
+
+.avant-garde-label {
+    font-size: 14px;
+    font-weight: 400;
+    text-transform: uppercase;
+    opacity: 0.7;
+    margin-bottom: 4px;
+}
+
+.avant-garde-value {
+    font-size: 12px;
+    font-weight: 300;
+    opacity: 0.9;
+    line-height: 1.4;
+}
+
+/* Mobile-specific styles */
+@media (max-width: 768px) {
+    .avant-garde-note {
+        bottom: 20px;
+        padding: 20px 25px;
+        width: 85%;
+        max-width: 320px;
+        gap: 15px;
+    }
+
+    .avant-garde-text {
+        gap: 8px;
+    }
+
+    .avant-garde-label {
+        font-size: 12px;
+    }
+
+    .avant-garde-value {
+        font-size: 10px;
+        line-height: 1.3;
+    }
+
+    .avant-garde-line {
+        width: 90%;
+    }
+}
+
+/* Extra small screens */
+@media (max-width: 480px) {
+    .avant-garde-note {
+        bottom: 15px;
+        padding: 15px 20px;
+        width: 90%;
+        max-width: 280px;
+    }
+
+    .avant-garde-label {
+        font-size: 11px;
+    }
+
+    .avant-garde-value {
+        font-size: 9px;
+    }
+}
+
+/* Ensure the note stays above other mobile elements */
+@media (max-width: 768px) {
+    .avant-garde-note {
+        z-index: 10002;
     }
 }
