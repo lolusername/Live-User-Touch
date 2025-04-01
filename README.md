@@ -71,12 +71,140 @@ This project uses WebGL, a technology that allows web browsers to create complex
 - Respond to user input immediately
 - Create dynamic look-up tables based on movement
 
-The technology works like this:
-1. The video plays like normal
-2. Your movements are tracked
-3. The computer applies color and contrast effects based on your position (similar to how a colorist applies LUTs)
-4. The result is displayed instantly
-5. Each movement creates a new color grading preset
+### How It Works
+
+The technology works through several key components:
+
+1. **WebGL Setup and Video Processing**
+```javascript
+// Create WebGL context - this gives us access to the GPU
+const gl = canvas.getContext('webgl');
+
+// Create a texture object to hold our video frame
+const videoTexture = gl.createTexture();
+
+// Bind the texture to make it the active texture
+gl.bindTexture(gl.TEXTURE_2D, videoTexture);
+
+// Copy the current video frame into the texture
+// RGBA means we're using red, green, blue, and alpha (transparency) channels
+// UNSIGNED_BYTE means each color channel is 0-255
+gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, video);
+```
+
+2. **Shader Programs**
+```glsl
+// Vertex Shader: Handles the position and texture coordinates of each pixel
+// This runs once for each vertex (corner) of our rectangle
+attribute vec4 a_position;    // The position of the vertex (x, y, z, w)
+attribute vec2 a_texCoord;    // The texture coordinate (u, v) for this vertex
+varying vec2 v_texCoord;      // Pass texture coordinates to fragment shader
+
+void main() {
+    gl_Position = a_position;  // Set the final position of the vertex
+    v_texCoord = a_texCoord;  // Pass texture coordinates to fragment shader
+}
+
+// Fragment Shader: Applies color effects to each pixel
+// This runs once for each pixel in our rectangle
+uniform sampler2D u_image;     // The video texture
+uniform vec2 u_resolution;     // The size of our canvas
+uniform float u_temperature;   // How warm/cool the colors should be (-1 to 1)
+uniform float u_contrast;      // How much contrast to apply (0.5 to 1.5)
+varying vec2 v_texCoord;       // Texture coordinates from vertex shader
+
+void main() {
+    // Get the color of the current pixel from the video
+    vec4 color = texture2D(u_image, v_texCoord);
+    
+    // Apply temperature (warm/cool)
+    // Adding to red and subtracting from blue creates warm/cool effect
+    color.r += u_temperature;  // Red channel
+    color.b -= u_temperature;  // Blue channel
+    
+    // Apply contrast
+    // First subtract 0.5 to center around 0, then multiply by contrast
+    // Finally add 0.5 back to get back to 0-1 range
+    color = (color - 0.5) * u_contrast + 0.5;
+    
+    // Output the final color
+    gl_FragColor = color;
+}
+```
+
+3. **Real-time Color Manipulation**
+```javascript
+// Update shader uniforms based on mouse position
+function updateEffects(mouseX, mouseY) {
+    // Calculate temperature (-1 to 1) based on horizontal position
+    // mouseX / window.innerWidth gives us 0 to 1
+    // Multiply by 2 and subtract 1 to get -1 to 1
+    const temperature = (mouseX / window.innerWidth) * 2 - 1;
+    
+    // Calculate contrast (0.5 to 1.5) based on vertical position
+    // mouseY / window.innerHeight gives us 0 to 1
+    // Add 0.5 to get 0.5 to 1.5 range
+    const contrast = 1.0 + (mouseY / window.innerHeight);
+    
+    // Update shader uniforms with new values
+    // These values will be used in the next frame render
+    gl.uniform1f(u_temperatureLocation, temperature);
+    gl.uniform1f(u_contrastLocation, contrast);
+}
+```
+
+### The Color Grading Pipeline
+
+1. **Input Processing**
+   - Video frames are captured and converted to WebGL textures
+   - Each frame is processed in real-time through our shader pipeline
+   - The texture coordinates (u, v) map each pixel to the correct position in the video
+
+2. **Color Transformation**
+   - Temperature adjustment: 
+     - Positive values add red and subtract blue (warm)
+     - Negative values add blue and subtract red (cool)
+   - Contrast adjustment:
+     - Values > 1 increase the difference between light and dark
+     - Values < 1 decrease the difference
+     - The formula (color - 0.5) * contrast + 0.5 preserves the middle gray
+
+3. **Output Rendering**
+   - Processed frames are rendered back to the canvas
+   - The result is displayed instantly with no perceptible delay
+   - Each pixel's color is calculated independently by the GPU
+
+### Performance Optimization
+
+The project uses several techniques to ensure smooth performance:
+- GPU-accelerated processing through WebGL
+  - All color calculations happen on the GPU
+  - Each pixel is processed in parallel
+- Efficient texture management
+  - Video frames are uploaded to GPU once per frame
+  - Texture coordinates are reused
+- Optimized shader calculations
+  - Minimal mathematical operations per pixel
+  - Efficient use of GPU registers
+- RequestAnimationFrame for smooth animation
+  - Synchronizes with screen refresh rate
+  - Prevents unnecessary frame renders
+
+### Technical Requirements
+
+To run this project, you need:
+- A modern web browser with WebGL support
+- JavaScript enabled
+- Sufficient GPU capabilities for real-time video processing
+- Modern hardware for optimal performance
+
+### How It Differs from Traditional LUTs
+
+Traditional Look-Up Tables (LUTs) are static color transformations applied during post-production. This project:
+- Creates dynamic, real-time LUTs based on user interaction
+- Allows for immediate visual feedback
+- Combines multiple color transformations simultaneously
+- Provides an interactive, experimental approach to color grading
 
 ## Tips for Best Experience
 
